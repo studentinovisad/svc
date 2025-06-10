@@ -1,0 +1,88 @@
+services:
+  # Reverse proxy
+  crowdsec:
+    image: docker.io/crowdsecurity/crowdsec:v1.6.4
+    environment:
+      COLLECTIONS: crowdsecurity/traefik crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
+      CUSTOM_HOSTNAME: crowdsec
+      BOUNCER_KEY_TRAEFIK: ${BOUNCER_KEY_TRAEFIK}
+    volumes:
+      - "./acquis.yaml:/etc/crowdsec/acquis.yaml:ro,z"
+      - "traefik-logs-vol:/var/log/traefik:ro,z"
+      - "crowdsec-db-vol:/var/lib/crowdsec/data:Z"
+      - "crowdsec-conf-vol:/etc/crowdsec:Z"
+    networks:
+      - internal
+    restart: unless-stopped
+  traefik:
+    depends_on:
+      - crowdsec
+    image: docker.io/library/traefik:v3.2.2
+    command:
+      - "--accesslog"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:8080"
+      - "--entrypoints.web.http.redirections.entrypoint.to=443"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:8443"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=acme/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      - "--experimental.plugins.bouncer.version=v1.3.5"
+    ports:
+      - "80:8080/tcp"
+      - "443:8443/tcp"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro,z"
+      - "traefik-logs-vol:/var/log/traefik:z"
+      - "traefik-acme-vol:/acme:Z"
+    networks:
+      - internal
+    restart: unless-stopped
+  # Bitwarden
+  vaultwarden:
+    image: docker.io/vaultwarden/server:1.33.2
+    environment:
+      DOMAIN: "https://${VAULTWARDEN_DOMAIN}"
+      SIGNUPS_ALLOWED: false
+      ORG_CREATION_USERS: "none"
+      PASSWORD_HINTS_ALLOWED: false
+      ADMIN_TOKEN: "${VAULTWARDEN_ADMIN_TOKEN}"
+      SMTP_HOST: "${VAULTWARDEN_SMTP_HOST}"
+      SMTP_FROM: "${VAULTWARDEN_SMTP_USERNAME}"
+      SMTP_FROM_NAME: "${VAULTWARDEN_FROM_NAME}"
+      SMTP_USERNAME: "${VAULTWARDEN_SMTP_USERNAME}"
+      SMTP_PASSWORD: "${VAULTWARDEN_STMP_PASSWORD}"
+    volumes:
+      - "vaultwarden-data-vol:/data:Z"
+    networks:
+      - internal
+    extra_hosts:
+      - "${VAULTWARDEN_SMTP_HOST}:${SMTP_HOST_PRIVATE_IP}"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`${VAULTWARDEN_DOMAIN}`)"
+      - "traefik.http.routers.backend.middlewares=crowdsec@docker"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.backend.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
+    restart: unless-stopped
+  # Mattermost
+  # Jitsi Meet
+  # beszel github
+networks:
+  internal:
+volumes:
+  crowdsec-db-vol:
+  crowdsec-conf-vol:
+  traefik-logs-vol:
+  traefik-acme-vol:
+  vaultwarden-data-vol:
