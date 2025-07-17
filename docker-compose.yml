@@ -1,7 +1,7 @@
 services:
   # Reverse proxy
   crowdsec:
-    image: docker.io/crowdsecurity/crowdsec:v1.6.4
+    image: docker.io/crowdsecurity/crowdsec:v1.6.10
     environment:
       COLLECTIONS: crowdsecurity/traefik crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
       CUSTOM_HOSTNAME: crowdsec
@@ -14,10 +14,11 @@ services:
     networks:
       - internal
     restart: unless-stopped
+
   traefik:
     depends_on:
       - crowdsec
-    image: docker.io/library/traefik:v3.2.2
+    image: docker.io/library/traefik:v3.4.4
     command:
       - "--accesslog"
       - "--accesslog.filepath=/var/log/traefik/access.log"
@@ -31,7 +32,7 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.storage=acme/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      - "--experimental.plugins.bouncer.version=v1.3.5"
+      - "--experimental.plugins.bouncer.version=v1.4.4"
     ports:
       - "80:8080/tcp"
       - "443:8443/tcp"
@@ -42,26 +43,77 @@ services:
     networks:
       - internal
     restart: unless-stopped
+
   # Bitwarden
-  vaultwarden:
-    image: docker.io/vaultwarden/server:1.33.2
+  vaultwarden-postgres:
+    image: docker.io/library/postgres:16.9
     environment:
-      DOMAIN: "https://${VAULTWARDEN_DOMAIN}"
-      SIGNUPS_ALLOWED: false
-      ORG_CREATION_USERS: "none"
-      PASSWORD_HINTS_ALLOWED: false
-      ADMIN_TOKEN: "${VAULTWARDEN_ADMIN_TOKEN}"
-      SMTP_HOST: "${VAULTWARDEN_SMTP_HOST}"
-      SMTP_FROM: "${VAULTWARDEN_SMTP_USERNAME}"
-      SMTP_FROM_NAME: "${VAULTWARDEN_FROM_NAME}"
-      SMTP_USERNAME: "${VAULTWARDEN_SMTP_USERNAME}"
-      SMTP_PASSWORD: "${VAULTWARDEN_STMP_PASSWORD}"
+      POSTGRES_DB: "${VAULTWARDEN_DATABASE_DB:-vw}"
+      POSTGRES_USER: "${VAULTWARDEN_DATABASE_USER:-vw}"
+      POSTGRES_PASSWORD: "${VAULTWARDEN_DATABASE_PASSWORD}"
     volumes:
-      - "vaultwarden-data-vol:/data:Z"
+      - type: volume
+        source: vaultwarden-postgres-vol
+        target: /var/lib/postgresql/data
+        volume:
+          nocopy: false
     networks:
       - internal
-    extra_hosts:
-      - "${VAULTWARDEN_SMTP_HOST}:${SMTP_HOST_PRIVATE_IP}"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${VAULTWARDEN_DATABASE_USER:-vw} -d ${VAULTWARDEN_DATABASE_DB:-vw}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  vaultwarden-pgdumper:
+    image: docker.io/martlark/pg_dump:16.1
+    environment:
+      CRON_SCHEDULE: "1 * * * *"
+      RETAIN_COUNT: 1
+      PGHOST: "vaultwarden-postgres"
+      POSTGRES_DB: "${VAULTWARDEN_DATABASE_DB:-vw}"
+      PGUSER: "${VAULTWARDEN_DATABASE_USER:-vw}"
+      POSTGRES_PASSWORD: "${VAULTWARDEN_DATABASE_PASSWORD}"
+    volumes:
+      - type: bind
+        source: /var/stor/pgdump/vaultwarden
+        target: /dump
+    networks:
+      - internal
+    restart: unless-stopped
+    depends_on:
+      vaultwarden-postgres:
+        condition: service_healthy
+        restart: true
+
+  vaultwarden:
+    image: docker.io/vaultwarden/server:1.34.1
+    environment:
+      DATABASE_URL: "postgresql://${VAULTWARDEN_DATABASE_USER:-vw}:${VAULTWARDEN_DATABASE_PASSWORD}@vaultwarden-postgres:5432/${VAULTWARDEN_DATABASE_DB:-vw}"
+      DOMAIN: "https://${VAULTWARDEN_DOMAIN}"
+      SIGNUPS_ALLOWED: false
+      SIGNUPS_VERIFY: true
+      INVITATIONS_ALLOWED: true
+      ORG_CREATION_USERS: "${VAULTWARDEN_ORG_CREATION_USERS:-none}"
+      PASSWORD_HINTS_ALLOWED: false
+      ADMIN_TOKEN: "${VAULTWARDEN_ADMIN_TOKEN}"
+      SMTP_HOST: "${VAULTWARDEN_SMTP_HOST:-}"
+      SMTP_FROM: "${VAULTWARDEN_SMTP_FROM:-}"
+      SMTP_FROM_NAME: "${VAULTWARDEN_FROM_NAME:-}"
+      SMTP_USERNAME: "${VAULTWARDEN_SMTP_USERNAME:-}"
+      SMTP_PASSWORD: "${VAULTWARDEN_STMP_PASSWORD:-}"
+    volumes:
+      - type: bind
+        source: /var/stor/vaultwarden/data
+        target: /data
+    networks:
+      - internal
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.vaultwarden.rule=Host(`${VAULTWARDEN_DOMAIN}`)"
@@ -75,6 +127,98 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
     restart: unless-stopped
+    depends_on:
+      vaultwarden-postgres:
+        condition: service_healthy
+        restart: true
+
+  # SFTPGo
+  sftpgo-postgres:
+    image: docker.io/library/postgres:16.9
+    environment:
+      POSTGRES_DB: "${SFTPGO_DATABASE_DB:-sgo}"
+      POSTGRES_USER: "${SFTPGO_DATABASE_USER:-sgo}"
+      POSTGRES_PASSWORD: "${SFTPGO_DATABASE_PASSWORD}"
+    volumes:
+      - type: volume
+        source: sftpgo-postgres-vol
+        target: /var/lib/postgresql/data
+        volume:
+          nocopy: false
+    networks:
+      - internal
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${SFTPGO_DATABASE_USER:-sgo} -d ${SFTPGO_DATABASE_DB:-sgo}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  sftpgo-pgdumper:
+    image: docker.io/martlark/pg_dump:16.1
+    environment:
+      CRON_SCHEDULE: "1 * * * *"
+      RETAIN_COUNT: 1
+      PGHOST: "sftpgo-postgres"
+      POSTGRES_DB: "${SFTPGO_DATABASE_DB:-sgo}"
+      PGUSER: "${SFTPGO_DATABASE_USER:-sgo}"
+      POSTGRES_PASSWORD: "${SFTPGO_DATABASE_PASSWORD}"
+    volumes:
+      - type: bind
+        source: /var/stor/pgdump/sftpgo
+        target: /dump
+    networks:
+      - internal
+    restart: unless-stopped
+    depends_on:
+      sftpgo-postgres:
+        condition: service_healthy
+        restart: true
+
+  sftpgo:
+    image: ghcr.io/drakkan/sftpgo:v2.6.6-distroless-slim
+    environment:
+      SFTPGO_DATA_PROVIDER__DRIVER: postgresql
+      SFTPGO_DATA_PROVIDER__NAME: ${SFTPGO_DATABASE_DB:-sgo}
+      SFTPGO_DATA_PROVIDER__HOS: sftpgo-postgres
+      SFTPGO_DATA_PROVIDER__PORT: 5432
+      SFTPGO_DATA_PROVIDER__USERNAME: ${SFTPGO_DATABASE_USER:-sgo}
+      SFTPGO_DATA_PROVIDER__PASSWORD: ${SFTPGO_DATABASE_PASSWORD}
+      SFTPGO_DEFAULT_ADMIN_PASSWORD: ${SFTPGO_ADMIN_PASSWORD}
+    volumes:
+      - type: bind
+        source: /var/stor/sftpgo/internal
+        target: /srv/sftpgo
+      - type: bind
+        source: /var/stor/sftpgo/storage
+        target: /var/lib/sftpgo
+    ports:
+      - "2022:2022"
+    networks:
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sftpgo.rule=Host(`${SFTPGO_DOMAIN}`)"
+      - "traefik.http.routers.sftpgo.middlewares=crowdsec@docker"
+      - "traefik.http.routers.sftpgo.entrypoints=websecure"
+      - "traefik.http.routers.sftpgo.tls=true"
+      - "traefik.http.routers.sftpgo.tls.certresolver=letsencrypt"
+      - "traefik.http.services.sftpgo.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
+    restart: unless-stopped
+    depends_on:
+      sftpgo-postgres:
+        condition: service_healthy
+        restart: true
+
   # Mattermost
   # Jitsi Meet
   # beszel github
@@ -85,4 +229,5 @@ volumes:
   crowdsec-conf-vol:
   traefik-logs-vol:
   traefik-acme-vol:
-  vaultwarden-data-vol:
+  vaultwarden-postgres-vol:
+  sftpgo-postgres-vol:
