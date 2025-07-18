@@ -39,18 +39,18 @@ services:
       - "--accesslog.filepath=/var/log/traefik/access.log"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:8080"
-      - "--entrypoints.web.http.redirections.entrypoint.to=443"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      - "--entrypoints.websecure.address=:8443"
+      - "--entrypoints.websecure.address=:443"
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=acme/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
       - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
       - "--experimental.plugins.bouncer.version=v1.4.4"
     ports:
-      - "80:8080/tcp"
-      - "443:8443/tcp"
+      - "80:80/tcp"
+      - "443:443/tcp"
     volumes:
       - type: volume
         source: traefik-logs-vol
@@ -224,7 +224,7 @@ services:
         source: /var/stor/sftpgo/storage
         target: /var/lib/sftpgo
     ports:
-      - "2022:2022"
+      - "2022:2022/tcp"
     networks:
       - internal
     labels:
