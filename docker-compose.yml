@@ -7,10 +7,25 @@ services:
       CUSTOM_HOSTNAME: crowdsec
       BOUNCER_KEY_TRAEFIK: ${BOUNCER_KEY_TRAEFIK}
     volumes:
-      - "./acquis.yaml:/etc/crowdsec/acquis.yaml:ro,z"
-      - "traefik-logs-vol:/var/log/traefik:ro,z"
-      - "crowdsec-db-vol:/var/lib/crowdsec/data:Z"
-      - "crowdsec-conf-vol:/etc/crowdsec:Z"
+      - type: volume
+        source: traefik-logs-vol
+        target: /var/log/traefik
+        volume:
+          nocopy: false
+      - type: volume
+        source: crowdsec-db-vol
+        target: /var/lib/crowdsec/data
+        volume:
+          nocopy: false
+      - type: volume
+        source: crowdsec-conf-vol
+        target: /etc/crowdsec
+        volume:
+          nocopy: false
+      - type: bind
+        source: ./acquis.yaml
+        target: /etc/crowdsec/acquis.yaml
+        read_only: true
     networks:
       - internal
     restart: unless-stopped
@@ -37,9 +52,20 @@ services:
       - "80:8080/tcp"
       - "443:8443/tcp"
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro,z"
-      - "traefik-logs-vol:/var/log/traefik:z"
-      - "traefik-acme-vol:/acme:Z"
+      - type: volume
+        source: traefik-logs-vol
+        target: /var/log/traefik
+        volume:
+          nocopy: false
+      - type: volume
+        source: traefik-acme-vol
+        target: /acme
+        volume:
+          nocopy: false
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
     networks:
       - internal
     restart: unless-stopped
