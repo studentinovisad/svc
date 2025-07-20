@@ -267,6 +267,12 @@ services:
     networks:
       - internal
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
   send:
     image: registry.gitlab.com/timvisee/send:v3.4.27
@@ -306,6 +312,7 @@ services:
     restart: unless-stopped
     depends_on:
       send-valkey:
+        condition: service_healthy
         restart: true
 
   # Mattermost
