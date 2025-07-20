@@ -32,7 +32,8 @@ services:
 
   traefik:
     depends_on:
-      - crowdsec
+      crowdsec:
+        restart: true
     image: docker.io/library/traefik:v3.4.4
     command:
       - "--accesslog"
@@ -305,7 +306,6 @@ services:
     restart: unless-stopped
     depends_on:
       send-valkey:
-        condition: service_healthy
         restart: true
 
   # Mattermost
