@@ -32,8 +32,7 @@ services:
 
   traefik:
     depends_on:
-      crowdsec:
-        restart: true
+      - crowdsec
     image: docker.io/library/traefik:v3.4.4
     command:
       - "--accesslog"
