@@ -352,6 +352,12 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      retries: 3
+      start_period: 10s
+      timeout: 10s
 
   # beszel github
 networks:
