@@ -266,7 +266,7 @@ services:
       ]
     volumes:
       - type: volume
-        source: send-valkey-vol
+        source: gokapi-valkey-vol
         target: /data
         volume:
           nocopy: false
@@ -332,4 +332,4 @@ volumes:
   traefik-acme-vol:
   vaultwarden-postgres-vol:
   sftpgo-postgres-vol:
-  send-valkey-vol:
+  gokapi-valkey-vol:
