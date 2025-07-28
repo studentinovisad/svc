@@ -265,11 +265,9 @@ services:
         "${GOKAPI_REDIS_PASSWORD}",
       ]
     volumes:
-      - type: volume
-        source: gokapi-valkey-vol
+      - type: bind
+        source: /var/stor/gokapi/redis
         target: /data
-        volume:
-          nocopy: false
     networks:
       - internal
     restart: unless-stopped
@@ -378,4 +376,3 @@ volumes:
   traefik-acme-vol:
   vaultwarden-postgres-vol:
   sftpgo-postgres-vol:
-  gokapi-valkey-vol:
