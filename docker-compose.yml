@@ -282,6 +282,7 @@ services:
     image: docker.io/f0rc3/gokapi:v2.0.1
     environment:
       DOCKER_NONROOT: true
+      GOKAPI_DISABLE_CORS_CHECK: true # Required for MinIO?
       GOKAPI_CHUNK_SIZE_MB: ${GOKAPI_CHUNK_SIZE_MB:-45}
       GOKAPI_MAX_FILESIZE: ${GOKAPI_MAX_FILESIZE:-102400} # In MB, so 100GB
       GOKAPI_MAX_MEMORY_UPLOAD: ${GOKAPI_MAX_MEMORY_UPLOAD:-50}
