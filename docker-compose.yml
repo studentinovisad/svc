@@ -331,6 +331,7 @@ services:
     image: docker.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
     command: "server /data"
     environment:
+      MINIO_BROWSER_REDIRECT_URL: "https://${MINIO_DOMAIN}"
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
