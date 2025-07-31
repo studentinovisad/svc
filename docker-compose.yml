@@ -1,7 +1,7 @@
 services:
   # Reverse proxy
   crowdsec:
-    image: docker.io/crowdsecurity/crowdsec:v1.6.10
+    image: docker.io/crowdsecurity/crowdsec:v1.6.11
     environment:
       COLLECTIONS: "crowdsecurity/traefik crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules"
       CUSTOM_HOSTNAME: "crowdsec"
@@ -33,7 +33,7 @@ services:
   traefik:
     depends_on:
       - crowdsec
-    image: docker.io/library/traefik:v3.4.4
+    image: docker.io/library/traefik:v3.4.5
     command:
       - "--accesslog"
       - "--accesslog.filepath=/var/log/traefik/access.log"
@@ -43,6 +43,7 @@ services:
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http3"
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=acme/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
@@ -51,6 +52,7 @@ services:
     ports:
       - "80:80/tcp"
       - "443:443/tcp"
+      - "443:443/udp"
     volumes:
       - type: volume
         source: traefik-logs-vol
