@@ -320,7 +320,125 @@ services:
         restart: true
 
   # Mattermost
+
   # Jitsi Meet
+  jitsi-web:
+    depends_on:
+      - jitsi-jvb
+    image: docker.io/jitsi/web:stable-10431
+    environment:
+      TZ: ${TZ:-UTC}
+      PUBLIC_URL: "https://${JITSI_DOMAIN}"
+      ENABLE_AUTH: ${JITSI_ENABLE_AUTH:-1}
+      ENABLE_GUESTS: ${JITSI_ENABLE_GUESTS:-1}
+    volumes:
+      - type: volume
+        source: jitsi-web-conf-vol
+        target: /config
+        volume:
+          nocopy: false
+      - type: volume
+        source: jitsi-web-crontab-vol
+        target: /var/spool/cron/crontabs
+        volume:
+          nocopy: false
+      - type: volume
+        source: jitsi-web-transcripts-vol
+        target: /usr/share/jitsi-meet/transcripts
+        volume:
+          nocopy: false
+      - type: volume
+        source: jitsi-web-load-vol
+        target: /usr/share/jitsi-meet/load-test
+        volume:
+          nocopy: false
+    networks:
+      internal:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jitsi.rule=Host(`${JITSI_DOMAIN}`)"
+      - "traefik.http.routers.jitsi.middlewares=crowdsec@docker"
+      - "traefik.http.routers.jitsi.entrypoints=websecure"
+      - "traefik.http.routers.jitsi.tls=true"
+      - "traefik.http.routers.jitsi.tls.certresolver=letsencrypt"
+      - "traefik.http.services.jitsi.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
+    restart: unless-stopped
+
+  jitsi-prosody:
+    image: docker.io/jitsi/prosody:stable-10431
+    environment:
+      TZ: ${TZ:-UTC}
+      PUBLIC_URL: "https://${JITSI_DOMAIN}"
+      AUTH_TYPE: ${JITSI_AUTH_TYPE:-internal}
+      ENABLE_AUTH: ${JITSI_ENABLE_AUTH:-1}
+      ENABLE_GUESTS: ${JITSI_ENABLE_GUESTS:-1}
+      JICOFO_AUTH_PASSWORD: ${JICOFO_AUTH_PASSWORD}
+      JVB_AUTH_PASSWORD: ${JVB_AUTH_PASSWORD}
+    volumes:
+      - type: volume
+        source: jitsi-prosody-conf-vol
+        target: /config
+        volume:
+          nocopy: false
+      - type: volume
+        source: jitsi-prosody-plugins-vol
+        target: /prosody-plugins-custom
+        volume:
+          nocopy: false
+    expose:
+      - "5222"
+      - "5269"
+      - "5347"
+      - "5280"
+    networks:
+      internal:
+        aliases:
+          - xmpp.meet.jitsi
+    restart: unless-stopped
+
+  jitsi-jicofo:
+    depends_on:
+      - jitsi-prosody
+    image: docker.io/jitsi/jicofo:stable-10431
+    environment:
+      TZ: ${TZ:-UTC}
+      PUBLIC_URL: "https://${JITSI_DOMAIN}"
+      AUTH_TYPE: ${JITSI_AUTH_TYPE:-internal}
+      ENABLE_AUTH: ${JITSI_ENABLE_AUTH:-1}
+      JICOFO_AUTH_PASSWORD: ${JICOFO_AUTH_PASSWORD}
+    volumes:
+      - type: volume
+        source: jitsi-jicofo-conf-vol
+        target: /config
+        volume:
+          nocopy: false
+    networks:
+      internal:
+    restart: unless-stopped
+
+  jitsi-jvb:
+    depends_on:
+      - jitsi-prosody
+    image: docker.io/jitsi/jvb:stable-10431
+    environment:
+      TZ: ${TZ:-UTC}
+      PUBLIC_URL: "https://${JITSI_DOMAIN}"
+      JVB_AUTH_PASSWORD: ${JVB_AUTH_PASSWORD}
+    volumes:
+      - type: volume
+        source: jitsi-jvb-conf-vol
+        target: /config
+        volume:
+          nocopy: false
+    ports:
+      - "10000:10000/udp"
+    networks:
+      internal:
+    restart: unless-stopped
 
   # MinIO
   minio:
@@ -365,8 +483,10 @@ services:
       timeout: 10s
 
   # beszel github
+
 networks:
   internal:
+
 volumes:
   crowdsec-db-vol:
   crowdsec-conf-vol:
@@ -374,3 +494,11 @@ volumes:
   traefik-acme-vol:
   vaultwarden-postgres-vol:
   sftpgo-postgres-vol:
+  jitsi-web-conf-vol:
+  jitsi-web-crontab-vol:
+  jitsi-web-transcripts-vol:
+  jitsi-web-load-vol:
+  jitsi-prosody-conf-vol:
+  jitsi-prosody-plugins-vol:
+  jitsi-jicofo-conf-vol:
+  jitsi-jvb-conf-vol:
