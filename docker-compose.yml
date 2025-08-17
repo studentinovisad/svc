@@ -646,6 +646,7 @@ volumes:
   wg-conf-vol:
   vaultwarden-postgres-vol:
   sftpgo-postgres-vol:
+  mattermost-postgres-vol:
   jitsi-web-conf-vol:
   jitsi-web-crontab-vol:
   jitsi-web-transcripts-vol:
