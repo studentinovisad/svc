@@ -379,6 +379,98 @@ services:
         restart: true
 
   # Mattermost
+  mattermost-postgres:
+    image: docker.io/library/postgres:16.9
+    environment:
+      POSTGRES_DB: ${MATTERMOST_DATABASE_DB:-mm}
+      POSTGRES_USER: ${MATTERMOST_DATABASE_USER:-mm}
+      POSTGRES_PASSWORD: ${MATTERMOST_DATABASE_PASSWORD}
+    volumes:
+      - type: volume
+        source: mattermost-postgres-vol
+        target: /var/lib/postgresql/data
+        volume:
+          nocopy: false
+    networks:
+      - internal
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${MATTERMOST_DATABASE_USER:-mm} -d ${MATTERMOST_DATABASE_DB:-mm}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  mattermost-pgdumper:
+    image: docker.io/martlark/pg_dump:16.1
+    environment:
+      CRON_SCHEDULE: "1 * * * *"
+      RETAIN_COUNT: 1
+      PGHOST: "mattermost-postgres"
+      POSTGRES_DB: ${MATTERMOST_DATABASE_DB:-mm}
+      PGUSER: ${MATTERMOST_DATABASE_USER:-mm}
+      POSTGRES_PASSWORD: ${MATTERMOST_DATABASE_PASSWORD}
+    volumes:
+      - type: bind
+        source: /var/stor/pgdump/mattermost
+        target: /dump
+    networks:
+      - internal
+    restart: unless-stopped
+    depends_on:
+      mattermost-postgres:
+        condition: service_healthy
+        restart: true
+
+  mattermost:
+    image: docker.io/mattermost/mattermost-team-edition:10.5.10
+    environment:
+      MM_SERVICESETTINGS_SITEURL: "https://${MATTERMOST_DOMAIN}"
+      MM_SQLSETTINGS_DRIVERNAME: "postgres"
+      MM_SQLSETTINGS_DATASOURCE: "postgres://${MATTERMOST_DATABASE_USER:-mm}:${MATTERMOST_DATABASE_PASSWORD}@mattermost-postgres:5432/${MATTERMOST_DATABASE_DB:-mm}?sslmode=disable&connect_timeout=10"
+      MM_BLEVESETTINGS_INDEXDIR: "/mattermost/bleve-indexes"
+    volumes:
+      - type: bind
+        source: /var/stor/mattermost/config
+        target: /mattermost/config
+      - type: bind
+        source: /var/stor/mattermost/data
+        target: /mattermost/data
+      - type: bind
+        source: /var/stor/mattermost/plugins
+        target: /mattermost/plugins
+      - type: bind
+        source: /var/stor/mattermost/client/plugins
+        target: /mattermost/client/plugins
+      - type: bind
+        source: /var/stor/mattermost/index
+        target: /mattermost/bleve-indexes
+    ports:
+      - "8443:8443/tcp"
+      - "8443:8443/udp"
+    networks:
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mattermost.rule=Host(`${MATTERMOST_DOMAIN}`)"
+      - "traefik.http.routers.mattermost.middlewares=crowdsec@docker"
+      - "traefik.http.routers.mattermost.entrypoints=websecure"
+      - "traefik.http.routers.mattermost.tls=true"
+      - "traefik.http.routers.mattermost.tls.certresolver=letsencrypt"
+      - "traefik.http.services.mattermost.loadbalancer.server.port=8065"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
+    restart: unless-stopped
+    depends_on:
+      mattermost-postgres:
+        condition: service_healthy
+        restart: true
 
   # Jitsi Meet
   jitsi-web:
