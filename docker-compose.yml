@@ -169,7 +169,7 @@ services:
       POSTGRES_PASSWORD: ${VAULTWARDEN_DATABASE_PASSWORD}
     volumes:
       - type: bind
-        source: /var/stor/pgdump/vaultwarden
+        source: /var/stor/vaultwarden/pgdump
         target: /dump
     networks:
       - internal
@@ -178,6 +178,31 @@ services:
       vaultwarden-postgres:
         condition: service_healthy
         restart: true
+
+  vaultwarden-restic:
+    image: ghcr.io/lobaro/restic-backup-docker:v1.4.0
+    environment:
+      RESTIC_REPOSITORY: "s3:${VAULTWARDEN_RESTIC_S3_ENDPOINT}/${VAULTWARDEN_RESTIC_S3_BUCKET}"
+      AWS_ACCESS_KEY_ID: "${VAULTWARDEN_RESTIC_S3_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${VAULTWARDEN_RESTIC_S3_SECRET_ACCESS_KEY}"
+      RESTIC_PASSWORD: "${VAULTWARDEN_RESTIC_ENCRYPTION_KEY}"
+      CRON_SCHEDULE: "52 * * * *" # Every hour at 52nd minute
+      BACKUP_PATHS: "/var/stor/vaultwarden"
+      BACKUP_TAGS: "vaultwarden"
+      FORGET_ARGS: "--keep-hourly 12 --keep-daily 7 --keep-weekly 4 --prune"
+    volumes:
+      - type: volume
+        source: vaultwarden-restic-vol
+        target: /.cache/restic
+        volume:
+          nocopy: false
+      - type: bind
+        source: /var/stor/vaultwarden
+        target: /var/stor/vaultwarden
+        read_only: true
+    networks:
+      - restic-backup-full
+    restart: unless-stopped
 
   vaultwarden:
     image: docker.io/vaultwarden/server:1.34.1
@@ -257,7 +282,7 @@ services:
       POSTGRES_PASSWORD: ${SFTPGO_DATABASE_PASSWORD}
     volumes:
       - type: bind
-        source: /var/stor/pgdump/sftpgo
+        source: /var/stor/sftpgo/pgdump
         target: /dump
     networks:
       - internal
@@ -266,6 +291,31 @@ services:
       sftpgo-postgres:
         condition: service_healthy
         restart: true
+
+  sftpgo-restic:
+    image: ghcr.io/lobaro/restic-backup-docker:v1.4.0
+    environment:
+      RESTIC_REPOSITORY: "s3:${SFTPGO_RESTIC_S3_ENDPOINT}/${SFTPGO_RESTIC_S3_BUCKET}"
+      AWS_ACCESS_KEY_ID: "${SFTPGO_RESTIC_S3_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${SFTPGO_RESTIC_S3_SECRET_ACCESS_KEY}"
+      RESTIC_PASSWORD: "${SFTPGO_RESTIC_ENCRYPTION_KEY}"
+      CRON_SCHEDULE: "52 4 * * *" # Every day at 04:52
+      BACKUP_PATHS: "/var/stor/sftpgo"
+      BACKUP_TAGS: "sftpgo"
+      FORGET_ARGS: "--keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune"
+    volumes:
+      - type: volume
+        source: sftpgo-restic-vol
+        target: /.cache/restic
+        volume:
+          nocopy: false
+      - type: bind
+        source: /var/stor/sftpgo
+        target: /var/stor/sftpgo
+        read_only: true
+    networks:
+      - restic-backup-full
+    restart: unless-stopped
 
   sftpgo:
     image: ghcr.io/drakkan/sftpgo:v2.6.6-distroless-slim
@@ -416,7 +466,7 @@ services:
       POSTGRES_PASSWORD: ${MATTERMOST_DATABASE_PASSWORD}
     volumes:
       - type: bind
-        source: /var/stor/pgdump/mattermost
+        source: /var/stor/mattermost/pgdump
         target: /dump
     networks:
       - internal
@@ -425,6 +475,31 @@ services:
       mattermost-postgres:
         condition: service_healthy
         restart: true
+
+  mattermost-restic:
+    image: ghcr.io/lobaro/restic-backup-docker:v1.4.0
+    environment:
+      RESTIC_REPOSITORY: "s3:${MATTERMOST_RESTIC_S3_ENDPOINT}/${MATTERMOST_RESTIC_S3_BUCKET}"
+      AWS_ACCESS_KEY_ID: "${MATTERMOST_RESTIC_S3_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${MATTERMOST_RESTIC_S3_SECRET_ACCESS_KEY}"
+      RESTIC_PASSWORD: "${MATTERMOST_RESTIC_ENCRYPTION_KEY}"
+      CRON_SCHEDULE: "52 * * * *" # Every hour at 52nd minute
+      BACKUP_PATHS: "/var/stor/mattermost"
+      BACKUP_TAGS: "mattermost"
+      FORGET_ARGS: "--keep-hourly 12 --keep-daily 7 --keep-weekly 4 --prune"
+    volumes:
+      - type: volume
+        source: mattermost-restic-vol
+        target: /.cache/restic
+        volume:
+          nocopy: false
+      - type: bind
+        source: /var/stor/mattermost
+        target: /var/stor/mattermost
+        read_only: true
+    networks:
+      - restic-backup-full
+    restart: unless-stopped
 
   mattermost:
     image: docker.io/mattermost/mattermost-team-edition:10.5.10
@@ -645,8 +720,11 @@ volumes:
   traefik-acme-vol:
   wg-conf-vol:
   vaultwarden-postgres-vol:
+  vaultwarden-restic-vol:
   sftpgo-postgres-vol:
+  sftpgo-restic-vol:
   mattermost-postgres-vol:
+  mattermost-restic-vol:
   jitsi-web-conf-vol:
   jitsi-web-crontab-vol:
   jitsi-web-transcripts-vol:
