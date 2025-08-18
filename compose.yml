@@ -393,6 +393,7 @@ services:
     networks:
       - traefik
       - gokapi
+      - minio
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.gokapi.rule=Host(`${GOKAPI_DOMAIN}`)"
@@ -505,6 +506,7 @@ services:
     networks:
       - traefik
       - mattermost
+      - minio
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.mattermost.rule=Host(`${MATTERMOST_DOMAIN}`)"
