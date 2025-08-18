@@ -82,7 +82,7 @@ services:
   wg-easy:
     image: ghcr.io/wg-easy/wg-easy:15.1.0
     environment:
-      WG_DEVICE: eth1
+      WG_DEVICE: lo # Set to eth1 to enable internet, lo is loopback so internet is unreachable via wireguard
       INIT_ENABLED: true
       INIT_USERNAME: ${VPN_GUI_USERNAME:-admin}
       INIT_PASSWORD: ${VPN_GUI_PASSWORD:-admin}
