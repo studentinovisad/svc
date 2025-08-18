@@ -100,12 +100,9 @@ services:
     networks:
       traefik:
         driver_opts:
-          com.docker.network.endpoint.ifname: eth1
-      wireguard:
-        driver_opts:
           com.docker.network.endpoint.ifname: eth0
       # Custom IP addresses required for correct IPv6 setup
-      # wireguard:
+      # traefik:
       #   driver_opts:
       #     com.docker.network.endpoint.ifname: eth0
       #   ipv4_address: 10.42.42.42
@@ -700,7 +697,6 @@ services:
 
 networks:
   traefik:
-  wireguard:
   vaultwarden:
   sftpgo:
   gokapi:
