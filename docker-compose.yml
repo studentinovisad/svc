@@ -77,13 +77,13 @@ services:
   wg-easy:
     image: ghcr.io/wg-easy/wg-easy:15.1.0
     environment:
-      WG_DEVICE: eth0
+      WG_DEVICE: lo # Set to eth0 to allow internet through the tunnel, lo is loopback so it doesn't have internet
       INIT_ENABLED: true
       INIT_USERNAME: ${VPN_GUI_USERNAME:-admin}
       INIT_PASSWORD: ${VPN_GUI_PASSWORD:-admin}
       INIT_HOST: ${VPN_DOMAIN:-}
       INIT_PORT: 51820
-      INIT_DNS: ${VPN_DNS:-9.9.9.9,149.112.112.112}
+      INIT_DNS: ${VPN_DNS:-9.9.9.9,149.112.112.112} # Sadly cannot be disabled
       INIT_IPV4_CIDR: 10.13.12.0/24
       INIT_IPV6_CIDR: fd00:1312::/64
     volumes:
