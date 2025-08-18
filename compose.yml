@@ -27,7 +27,7 @@ services:
         target: /etc/crowdsec/acquis.yaml
         read_only: true
     networks:
-      - crowdsec
+      - traefik
     restart: unless-stopped
 
   traefik:
@@ -70,7 +70,6 @@ services:
         read_only: true
     networks:
       - traefik
-      - crowdsec
     restart: unless-stopped
 
   # VPN
@@ -701,7 +700,6 @@ services:
 
 networks:
   traefik:
-  crowdsec:
   wireguard:
   vaultwarden:
   sftpgo:
