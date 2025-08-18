@@ -76,7 +76,7 @@ services:
   wg-easy:
     image: ghcr.io/wg-easy/wg-easy:15.1.0
     environment:
-      WG_DEVICE: lo # Set to eth0 to allow internet through the tunnel, lo is loopback so it doesn't have internet
+      WG_DEVICE: eth1
       INIT_ENABLED: true
       INIT_USERNAME: ${VPN_GUI_USERNAME:-admin}
       INIT_PASSWORD: ${VPN_GUI_PASSWORD:-admin}
@@ -101,10 +101,13 @@ services:
       traefik:
         driver_opts:
           com.docker.network.endpoint.ifname: eth0
+      wireguard:
+        driver_opts:
+          com.docker.network.endpoint.ifname: eth1
       # Custom IP addresses required for correct IPv6 setup
-      # traefik:
+      # wireguard:
       #   driver_opts:
-      #     com.docker.network.endpoint.ifname: eth0
+      #     com.docker.network.endpoint.ifname: eth1
       #   ipv4_address: 10.42.42.42
       #   ipv6_address: fdcc:ad94:bacf:61a3::2a
     cap_add:
@@ -697,6 +700,7 @@ services:
 
 networks:
   traefik:
+  wireguard:
   vaultwarden:
   sftpgo:
   gokapi:
