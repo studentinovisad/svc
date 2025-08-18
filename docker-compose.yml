@@ -71,7 +71,6 @@ services:
     networks:
       - traefik
       - crowdsec
-      - wireguard # Had to be added here to make sure wg-easy container has no internet access
     restart: unless-stopped
 
   # VPN
@@ -100,6 +99,9 @@ services:
     ports:
       - "51820:51820/udp"
     networks:
+      traefik:
+        driver_opts:
+          com.docker.network.endpoint.ifname: eth1
       wireguard:
         driver_opts:
           com.docker.network.endpoint.ifname: eth0
@@ -701,7 +703,6 @@ networks:
   traefik:
   crowdsec:
   wireguard:
-    internal: true # Disabled internet
   vaultwarden:
   sftpgo:
   gokapi:
