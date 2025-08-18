@@ -477,7 +477,7 @@ services:
         target: /data/backup
         read_only: true
     networks:
-      - restic-backup-full
+      - internal
     restart: unless-stopped
 
   mattermost:
