@@ -28,6 +28,11 @@ services:
         read_only: true
     networks:
       - crowdsec
+    labels:
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
     restart: unless-stopped
 
   traefik:
@@ -74,66 +79,62 @@ services:
     restart: unless-stopped
 
   # VPN
-  # wg-easy:
-  #   image: ghcr.io/wg-easy/wg-easy:15.1.0
-  #   environment:
-  #     WG_DEVICE: eth1
-  #     INIT_ENABLED: true
-  #     INIT_USERNAME: ${VPN_GUI_USERNAME:-admin}
-  #     INIT_PASSWORD: ${VPN_GUI_PASSWORD:-admin}
-  #     INIT_HOST: ${VPN_DOMAIN:-}
-  #     INIT_PORT: 51820
-  #     INIT_DNS: ${VPN_DNS:-9.9.9.9,149.112.112.112} # Sadly cannot be disabled
-  #     INIT_IPV4_CIDR: 10.13.12.0/24
-  #     INIT_IPV6_CIDR: fd00:1312::/64
-  #   volumes:
-  #     - type: volume
-  #       source: wg-conf-vol
-  #       target: /etc/wireguard
-  #       volume:
-  #         nocopy: false
-  #     - type: bind
-  #       source: /lib/modules
-  #       target: /lib/modules
-  #       read_only: true
-  #   ports:
-  #     - "51820:51820/udp"
-  #   networks:
-  #     traefik:
-  #       driver_opts:
-  #         com.docker.network.endpoint.ifname: eth0
-  #     wireguard:
-  #       driver_opts:
-  #         com.docker.network.endpoint.ifname: eth1
-  #     # Custom IP addresses required for correct IPv6 setup
-  #     # wireguard:
-  #     #   driver_opts:
-  #     #     com.docker.network.endpoint.ifname: eth1
-  #     #   ipv4_address: 10.42.42.42
-  #     #   ipv6_address: fdcc:ad94:bacf:61a3::2a
-  #   cap_add:
-  #     - NET_ADMIN
-  #     - SYS_MODULE
-  #   sysctls:
-  #     - net.ipv4.ip_forward=1
-  #     - net.ipv4.conf.all.src_valid_mark=1
-  #     # Uncomment to enable IPv6
-  #     # - net.ipv6.conf.all.disable_ipv6=0
-  #     # - net.ipv6.conf.all.forwarding=1
-  #     # - net.ipv6.conf.default.forwarding=1
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.wgui.rule=Host(`${VPN_DOMAIN}`)"
-  #     - "traefik.http.routers.wgui.middlewares=crowdsec@docker"
-  #     - "traefik.http.routers.wgui.entrypoints=websecure"
-  #     - "traefik.http.routers.wgui.tls=true"
-  #     - "traefik.http.routers.wgui.tls.certresolver=letsencrypt"
-  #     - "traefik.http.services.wgui.loadbalancer.server.port=51821"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
-  #   restart: unless-stopped
+  wg-easy:
+    image: ghcr.io/wg-easy/wg-easy:15.1.0
+    environment:
+      WG_DEVICE: eth1
+      INIT_ENABLED: true
+      INIT_USERNAME: ${VPN_GUI_USERNAME:-admin}
+      INIT_PASSWORD: ${VPN_GUI_PASSWORD:-admin}
+      INIT_HOST: ${VPN_DOMAIN:-}
+      INIT_PORT: 51820
+      INIT_DNS: ${VPN_DNS:-9.9.9.9,149.112.112.112} # Sadly cannot be disabled
+      INIT_IPV4_CIDR: 10.13.12.0/24
+      INIT_IPV6_CIDR: fd00:1312::/64
+    volumes:
+      - type: volume
+        source: wg-conf-vol
+        target: /etc/wireguard
+        volume:
+          nocopy: false
+      - type: bind
+        source: /lib/modules
+        target: /lib/modules
+        read_only: true
+    ports:
+      - "51820:51820/udp"
+    networks:
+      traefik:
+        driver_opts:
+          com.docker.network.endpoint.ifname: eth0
+      wireguard:
+        driver_opts:
+          com.docker.network.endpoint.ifname: eth1
+      # Custom IP addresses required for correct IPv6 setup
+      # wireguard:
+      #   driver_opts:
+      #     com.docker.network.endpoint.ifname: eth1
+      #   ipv4_address: 10.42.42.42
+      #   ipv6_address: fdcc:ad94:bacf:61a3::2a
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+      # Uncomment to enable IPv6
+      # - net.ipv6.conf.all.disable_ipv6=0
+      # - net.ipv6.conf.all.forwarding=1
+      # - net.ipv6.conf.default.forwarding=1
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.wg-easy.rule=Host(`${VPN_DOMAIN}`)"
+      # - "traefik.http.routers.wgui.middlewares=crowdsec@docker"
+      - "traefik.http.routers.wg-easy.entrypoints=websecure"
+      - "traefik.http.routers.wg-easy.tls=true"
+      - "traefik.http.routers.wg-easy.tls.certresolver=letsencrypt"
+      - "traefik.http.services.wg-easy.loadbalancer.server.port=51821"
+    restart: unless-stopped
 
   # Password manager
   vaultwarden-postgres:
@@ -227,15 +228,11 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.vaultwarden.rule=Host(`${VAULTWARDEN_DOMAIN}`)"
-      - "traefik.http.routers.vaultwarden.middlewares=crowdsec@docker"
+      # - "traefik.http.routers.vaultwarden.middlewares=crowdsec@docker"
       - "traefik.http.routers.vaultwarden.entrypoints=websecure"
       - "traefik.http.routers.vaultwarden.tls=true"
       - "traefik.http.routers.vaultwarden.tls.certresolver=letsencrypt"
       - "traefik.http.services.vaultwarden.loadbalancer.server.port=80"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
     restart: unless-stopped
     depends_on:
       vaultwarden-postgres:
@@ -341,15 +338,11 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.sftpgo.rule=Host(`${SFTPGO_DOMAIN}`)"
-      - "traefik.http.routers.sftpgo.middlewares=crowdsec@docker"
+      # - "traefik.http.routers.sftpgo.middlewares=crowdsec@docker"
       - "traefik.http.routers.sftpgo.entrypoints=websecure"
       - "traefik.http.routers.sftpgo.tls=true"
       - "traefik.http.routers.sftpgo.tls.certresolver=letsencrypt"
       - "traefik.http.services.sftpgo.loadbalancer.server.port=8080"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
     restart: unless-stopped
     depends_on:
       sftpgo-postgres:
@@ -403,15 +396,11 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.gokapi.rule=Host(`${GOKAPI_DOMAIN}`)"
-      - "traefik.http.routers.gokapi.middlewares=crowdsec@docker"
+      # - "traefik.http.routers.gokapi.middlewares=crowdsec@docker"
       - "traefik.http.routers.gokapi.entrypoints=websecure"
       - "traefik.http.routers.gokapi.tls=true"
       - "traefik.http.routers.gokapi.tls.certresolver=letsencrypt"
       - "traefik.http.services.gokapi.loadbalancer.server.port=53842"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
     restart: unless-stopped
     depends_on:
       gokapi-valkey:
@@ -519,15 +508,11 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.mattermost.rule=Host(`${MATTERMOST_DOMAIN}`)"
-      - "traefik.http.routers.mattermost.middlewares=crowdsec@docker"
+      # - "traefik.http.routers.mattermost.middlewares=crowdsec@docker"
       - "traefik.http.routers.mattermost.entrypoints=websecure"
       - "traefik.http.routers.mattermost.tls=true"
       - "traefik.http.routers.mattermost.tls.certresolver=letsencrypt"
       - "traefik.http.services.mattermost.loadbalancer.server.port=8065"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
     restart: unless-stopped
     depends_on:
       mattermost-postgres:
@@ -571,15 +556,11 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.jitsi.rule=Host(`${JITSI_DOMAIN}`)"
-      - "traefik.http.routers.jitsi.middlewares=crowdsec@docker"
+      # - "traefik.http.routers.jitsi.middlewares=crowdsec@docker"
       - "traefik.http.routers.jitsi.entrypoints=websecure"
       - "traefik.http.routers.jitsi.tls=true"
       - "traefik.http.routers.jitsi.tls.certresolver=letsencrypt"
       - "traefik.http.services.jitsi.loadbalancer.server.port=80"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
     restart: unless-stopped
 
   jitsi-prosody:
@@ -672,23 +653,19 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.minio.rule=Host(`${MINIO_S3_DOMAIN}`)"
-      - "traefik.http.routers.minio.middlewares=crowdsec@docker"
+      # - "traefik.http.routers.minio.middlewares=crowdsec@docker"
       - "traefik.http.routers.minio.entrypoints=websecure"
       - "traefik.http.routers.minio.tls=true"
       - "traefik.http.routers.minio.tls.certresolver=letsencrypt"
       - "traefik.http.routers.minio.service=minio"
       - "traefik.http.services.minio.loadbalancer.server.port=9000"
       - "traefik.http.routers.minio-console.rule=Host(`${MINIO_CONSOLE_DOMAIN}`)"
-      - "traefik.http.routers.minio-console.middlewares=crowdsec@docker"
+      # - "traefik.http.routers.minio-console.middlewares=crowdsec@docker"
       - "traefik.http.routers.minio-console.entrypoints=websecure"
       - "traefik.http.routers.minio-console.tls=true"
       - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
       - "traefik.http.routers.minio-console.service=minio-console"
       - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
