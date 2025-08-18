@@ -182,25 +182,18 @@ services:
         restart: true
 
   vaultwarden-restic:
-    image: ghcr.io/lobaro/restic-backup-docker:v1.4.0
+    image: ghcr.io/lobaro/restic-backup-docker:v1.4.2
     environment:
+      BACKUP_CRON: "52 * * * *" # Every hour at 52nd minute
+      RESTIC_FORGET_ARGS: "--prune --keep-last 3 --keep-hourly 12 --keep-daily 7 --keep-weekly 4 --keep-monthly 3"
+      RESTIC_PASSWORD: "${VAULTWARDEN_RESTIC_ENCRYPTION_KEY}"
       RESTIC_REPOSITORY: "s3:${VAULTWARDEN_RESTIC_S3_ENDPOINT}/${VAULTWARDEN_RESTIC_S3_BUCKET}"
       AWS_ACCESS_KEY_ID: "${VAULTWARDEN_RESTIC_S3_ACCESS_KEY_ID}"
       AWS_SECRET_ACCESS_KEY: "${VAULTWARDEN_RESTIC_S3_SECRET_ACCESS_KEY}"
-      RESTIC_PASSWORD: "${VAULTWARDEN_RESTIC_ENCRYPTION_KEY}"
-      CRON_SCHEDULE: "52 * * * *" # Every hour at 52nd minute
-      BACKUP_PATHS: "/var/stor/vaultwarden"
-      BACKUP_TAGS: "vaultwarden"
-      FORGET_ARGS: "--keep-hourly 12 --keep-daily 7 --keep-weekly 4 --prune"
     volumes:
-      - type: volume
-        source: vaultwarden-restic-vol
-        target: /.cache/restic
-        volume:
-          nocopy: false
       - type: bind
         source: /var/stor/vaultwarden
-        target: /var/stor/vaultwarden
+        target: /data/backup
         read_only: true
     networks:
       - vaultwarden
@@ -296,25 +289,18 @@ services:
         restart: true
 
   sftpgo-restic:
-    image: ghcr.io/lobaro/restic-backup-docker:v1.4.0
+    image: ghcr.io/lobaro/restic-backup-docker:v1.4.2
     environment:
+      BACKUP_CRON: "52 4 * * *" # Every day at 04:52
+      RESTIC_FORGET_ARGS: "--prune --keep-last 3 --keep-daily 7 --keep-weekly 4 --keep-monthly 3"
+      RESTIC_PASSWORD: "${SFTPGO_RESTIC_ENCRYPTION_KEY}"
       RESTIC_REPOSITORY: "s3:${SFTPGO_RESTIC_S3_ENDPOINT}/${SFTPGO_RESTIC_S3_BUCKET}"
       AWS_ACCESS_KEY_ID: "${SFTPGO_RESTIC_S3_ACCESS_KEY_ID}"
       AWS_SECRET_ACCESS_KEY: "${SFTPGO_RESTIC_S3_SECRET_ACCESS_KEY}"
-      RESTIC_PASSWORD: "${SFTPGO_RESTIC_ENCRYPTION_KEY}"
-      CRON_SCHEDULE: "52 4 * * *" # Every day at 04:52
-      BACKUP_PATHS: "/var/stor/sftpgo"
-      BACKUP_TAGS: "sftpgo"
-      FORGET_ARGS: "--keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune"
     volumes:
-      - type: volume
-        source: sftpgo-restic-vol
-        target: /.cache/restic
-        volume:
-          nocopy: false
       - type: bind
         source: /var/stor/sftpgo
-        target: /var/stor/sftpgo
+        target: /data/backup
         read_only: true
     networks:
       - sftpgo
@@ -482,25 +468,18 @@ services:
         restart: true
 
   mattermost-restic:
-    image: ghcr.io/lobaro/restic-backup-docker:v1.4.0
+    image: ghcr.io/lobaro/restic-backup-docker:v1.4.2
     environment:
+      BACKUP_CRON: "52 * * * *" # Every hour at 52nd minute
+      RESTIC_FORGET_ARGS: "--prune --keep-last 3 --keep-hourly 12 --keep-daily 7 --keep-weekly 4 --keep-monthly 3"
+      RESTIC_PASSWORD: "${MATTERMOST_RESTIC_ENCRYPTION_KEY}"
       RESTIC_REPOSITORY: "s3:${MATTERMOST_RESTIC_S3_ENDPOINT}/${MATTERMOST_RESTIC_S3_BUCKET}"
       AWS_ACCESS_KEY_ID: "${MATTERMOST_RESTIC_S3_ACCESS_KEY_ID}"
       AWS_SECRET_ACCESS_KEY: "${MATTERMOST_RESTIC_S3_SECRET_ACCESS_KEY}"
-      RESTIC_PASSWORD: "${MATTERMOST_RESTIC_ENCRYPTION_KEY}"
-      CRON_SCHEDULE: "52 * * * *" # Every hour at 52nd minute
-      BACKUP_PATHS: "/var/stor/mattermost"
-      BACKUP_TAGS: "mattermost"
-      FORGET_ARGS: "--keep-hourly 12 --keep-daily 7 --keep-weekly 4 --prune"
     volumes:
-      - type: volume
-        source: mattermost-restic-vol
-        target: /.cache/restic
-        volume:
-          nocopy: false
       - type: bind
         source: /var/stor/mattermost
-        target: /var/stor/mattermost
+        target: /data/backup
         read_only: true
     networks:
       - mattermost
@@ -737,11 +716,8 @@ volumes:
   traefik-acme-vol:
   wg-conf-vol:
   vaultwarden-postgres-vol:
-  vaultwarden-restic-vol:
   sftpgo-postgres-vol:
-  sftpgo-restic-vol:
   mattermost-postgres-vol:
-  mattermost-restic-vol:
   jitsi-web-conf-vol:
   jitsi-web-crontab-vol:
   jitsi-web-transcripts-vol:
