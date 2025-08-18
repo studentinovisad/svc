@@ -525,6 +525,9 @@ services:
       mattermost-postgres:
         condition: service_healthy
         restart: true
+      minio:
+        condition: service_healthy
+        restart: true
 
   # Jitsi Meet
   jitsi-web:
