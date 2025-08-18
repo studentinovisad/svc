@@ -27,7 +27,7 @@ services:
         target: /etc/crowdsec/acquis.yaml
         read_only: true
     networks:
-      - internal
+      - crowdsec
     restart: unless-stopped
 
   traefik:
@@ -69,7 +69,8 @@ services:
         target: /var/run/docker.sock
         read_only: true
     networks:
-      - internal
+      - traefik
+      - crowdsec
     restart: unless-stopped
 
   # VPN
@@ -82,7 +83,7 @@ services:
       INIT_PASSWORD: ${VPN_GUI_PASSWORD:-admin}
       INIT_HOST: ${VPN_DOMAIN:-}
       INIT_PORT: 51820
-      INIT_DNS: ${VPN_DNS:-}
+      INIT_DNS: ${VPN_DNS:-9.9.9.9,149.112.112.112}
       INIT_IPV4_CIDR: 10.13.12.0/24
       INIT_IPV6_CIDR: fd00:1312::/64
     volumes:
@@ -98,7 +99,8 @@ services:
     ports:
       - "51820:51820/udp"
     networks:
-      internal:
+      traefik:
+      wireguard:
         driver_opts:
           com.docker.network.endpoint.ifname: eth0
       # Custom IP addresses required for correct IPv6 setup
@@ -131,7 +133,7 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
     restart: unless-stopped
 
-  # Bitwarden
+  # Password manager
   vaultwarden-postgres:
     image: docker.io/library/postgres:16.9
     environment:
@@ -145,7 +147,7 @@ services:
         volume:
           nocopy: false
     networks:
-      - internal
+      - vaultwarden
     restart: unless-stopped
     healthcheck:
       test:
@@ -172,7 +174,7 @@ services:
         source: /var/stor/vaultwarden/pgdump
         target: /dump
     networks:
-      - internal
+      - vaultwarden
     restart: unless-stopped
     depends_on:
       vaultwarden-postgres:
@@ -201,7 +203,7 @@ services:
         target: /var/stor/vaultwarden
         read_only: true
     networks:
-      - restic-backup-full
+      - vaultwarden
     restart: unless-stopped
 
   vaultwarden:
@@ -225,7 +227,8 @@ services:
         source: /var/stor/vaultwarden/data
         target: /data
     networks:
-      - internal
+      - traefik
+      - vaultwarden
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.vaultwarden.rule=Host(`${VAULTWARDEN_DOMAIN}`)"
@@ -244,7 +247,7 @@ services:
         condition: service_healthy
         restart: true
 
-  # SFTPGo
+  # Drive
   sftpgo-postgres:
     image: docker.io/library/postgres:16.9
     environment:
@@ -258,7 +261,7 @@ services:
         volume:
           nocopy: false
     networks:
-      - internal
+      - sftpgo
     restart: unless-stopped
     healthcheck:
       test:
@@ -285,7 +288,7 @@ services:
         source: /var/stor/sftpgo/pgdump
         target: /dump
     networks:
-      - internal
+      - sftpgo
     restart: unless-stopped
     depends_on:
       sftpgo-postgres:
@@ -314,7 +317,7 @@ services:
         target: /var/stor/sftpgo
         read_only: true
     networks:
-      - restic-backup-full
+      - sftpgo
     restart: unless-stopped
 
   sftpgo:
@@ -345,7 +348,8 @@ services:
     ports:
       - "2022:2022/tcp"
     networks:
-      - internal
+      - traefik
+      - sftpgo
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.sftpgo.rule=Host(`${SFTPGO_DOMAIN}`)"
@@ -364,7 +368,7 @@ services:
         condition: service_healthy
         restart: true
 
-  # Gokapi
+  # Send (transfer)
   gokapi-valkey:
     image: docker.io/valkey/valkey:8.1.3
     command:
@@ -380,7 +384,7 @@ services:
         source: /var/stor/gokapi/redis
         target: /data
     networks:
-      - internal
+      - gokapi
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "valkey-cli", "-a", "${GOKAPI_REDIS_PASSWORD}", "ping"]
@@ -406,7 +410,8 @@ services:
         source: /var/stor/gokapi/data
         target: /app/data
     networks:
-      - internal
+      - traefik
+      - gokapi
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.gokapi.rule=Host(`${GOKAPI_DOMAIN}`)"
@@ -442,7 +447,7 @@ services:
         volume:
           nocopy: false
     networks:
-      - internal
+      - mattermost
     restart: unless-stopped
     healthcheck:
       test:
@@ -469,7 +474,7 @@ services:
         source: /var/stor/mattermost/pgdump
         target: /dump
     networks:
-      - internal
+      - mattermost
     restart: unless-stopped
     depends_on:
       mattermost-postgres:
@@ -498,7 +503,7 @@ services:
         target: /var/stor/mattermost
         read_only: true
     networks:
-      - restic-backup-full
+      - mattermost
     restart: unless-stopped
 
   mattermost:
@@ -528,7 +533,8 @@ services:
       - "8443:8443/tcp"
       - "8443:8443/udp"
     networks:
-      - internal
+      - traefik
+      - mattermost
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.mattermost.rule=Host(`${MATTERMOST_DOMAIN}`)"
@@ -579,7 +585,8 @@ services:
         volume:
           nocopy: false
     networks:
-      internal:
+      - traefik
+      - jitsi
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.jitsi.rule=Host(`${JITSI_DOMAIN}`)"
@@ -621,7 +628,7 @@ services:
       - "5347"
       - "5280"
     networks:
-      internal:
+      jitsi:
         aliases:
           - xmpp.meet.jitsi
     restart: unless-stopped
@@ -643,7 +650,7 @@ services:
         volume:
           nocopy: false
     networks:
-      internal:
+      - jitsi
     restart: unless-stopped
 
   jitsi-jvb:
@@ -663,7 +670,7 @@ services:
     ports:
       - "10000:10000/udp"
     networks:
-      internal:
+      - jitsi
     restart: unless-stopped
 
   # MinIO
@@ -679,7 +686,8 @@ services:
         source: /var/stor/minio/data
         target: /data
     networks:
-      - internal
+      - traefik
+      - minio
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.minio.rule=Host(`${MINIO_S3_DOMAIN}`)"
@@ -711,7 +719,16 @@ services:
   # beszel github
 
 networks:
-  internal:
+  traefik:
+  crowdsec:
+  wireguard:
+    internal: true # Disabled internet
+  vaultwarden:
+  sftpgo:
+  gokapi:
+  mattermost:
+  jitsi:
+  minio:
 
 volumes:
   crowdsec-db-vol:
