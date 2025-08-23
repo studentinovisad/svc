@@ -1,0 +1,1 @@
+docker compose exec -it jitsi-prosody prosodyctl --config /config/prosody.cfg.lua register <username> meet.jitsi <password>
