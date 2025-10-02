@@ -1,0 +1,14 @@
+{
+  "status": 1,
+  "username": "{{Name}}",
+  "home_dir": "",
+  "permissions": {
+    "/": ["*"]
+  },
+  "groups": [
+    {
+      "name": "<group_name>",
+      "type": 1
+    }
+  ]
+}
