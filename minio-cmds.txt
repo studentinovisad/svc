@@ -1,25 +1,5 @@
-mc mb binfo-backup/vaultwarden-restic
-mc quota set binfo-backup/vaultwarden-restic --size 1t
-mc admin user add binfo-backup vaultwarden-restic <secret>
-mc admin policy create binfo-backup vaultwarden-restic-policy resticpolicy.json
-mc admin policy attach binfo-backup vaultwarden-restic-policy --user vaultwarden-restic
-
---- resticpolicy.json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:ListBucket",
-        "s3:DeleteObject"
-      ],
-      "Resource": [
-        "arn:aws:s3:::vaultwarden-restic",
-        "arn:aws:s3:::vaultwarden-restic/*"
-      ]
-    }
-  ]
-}
+mc mb binfo-backup/<service>-<type>
+mc quota set binfo-backup/<service>-<type> --size 1t
+mc admin user add binfo-backup <service>-<type> <secret>
+mc admin policy create binfo-backup <service>-<type>-policy minio-policy.json
+mc admin policy attach binfo-backup <service>-<type>-policy --user <service>-<type>

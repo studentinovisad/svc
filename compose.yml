@@ -357,8 +357,55 @@ services:
         condition: service_healthy
         restart: true
 
-  # Gokapi
-  gokapi-valkey:
+  # NocoDB
+  nocodb-postgres:
+    image: docker.io/library/postgres:16.9
+    environment:
+      POSTGRES_DB: ${NOCODB_DATABASE_DB:-ndb}
+      POSTGRES_USER: ${NOCODB_DATABASE_USER:-ndb}
+      POSTGRES_PASSWORD: ${NOCODB_DATABASE_PASSWORD}
+    volumes:
+      - type: volume
+        source: nocodb-postgres-vol
+        target: /var/lib/postgresql/data
+        volume:
+          nocopy: false
+    networks:
+      - internal
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${NOCODB_DATABASE_USER:-ndb} -d ${NOCODB_DATABASE_DB:-ndb}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  nocodb-pgdumper:
+    image: docker.io/martlark/pg_dump:16.1
+    environment:
+      CRON_SCHEDULE: "1 * * * *"
+      RETAIN_COUNT: 1
+      PGHOST: "nocodb-postgres"
+      POSTGRES_DB: ${NOCODB_DATABASE_DB:-ndb}
+      PGUSER: ${NOCODB_DATABASE_USER:-ndb}
+      POSTGRES_PASSWORD: ${NOCODB_DATABASE_PASSWORD}
+    volumes:
+      - type: bind
+        source: /var/stor/nocodb/pgdump
+        target: /dump
+    networks:
+      - internal
+    restart: unless-stopped
+    depends_on:
+      nocodb-postgres:
+        condition: service_healthy
+        restart: true
+
+  nocodb-valkey:
     image: docker.io/valkey/valkey:8.1.3
     command:
       [
@@ -366,176 +413,85 @@ services:
         "--appendonly",
         "yes",
         "--requirepass",
-        "${GOKAPI_REDIS_PASSWORD}",
+        "${NOCODB_CACHE_PASSWORD}",
       ]
     volumes:
-      - type: bind
-        source: /var/stor/gokapi/redis
+      - type: volume
+        source: nocodb-valkey-vol
         target: /data
+        volume:
+          nocopy: false
     networks:
       - internal
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "valkey-cli", "-a", "${GOKAPI_REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "valkey-cli", "-a", "${NOCODB_CACHE_PASSWORD}", "ping"]
       interval: 10s
       timeout: 3s
       retries: 3
       start_period: 5s
 
-  gokapi:
-    image: docker.io/f0rc3/gokapi:v2.0.1
-    environment:
-      DOCKER_NONROOT: true
-      GOKAPI_DISABLE_CORS_CHECK: true # Required for MinIO?
-      GOKAPI_CHUNK_SIZE_MB: ${GOKAPI_CHUNK_SIZE_MB:-45}
-      GOKAPI_MAX_FILESIZE: ${GOKAPI_MAX_FILESIZE:-102400} # In MB, so 100GB
-      GOKAPI_MAX_MEMORY_UPLOAD: ${GOKAPI_MAX_MEMORY_UPLOAD:-50}
-      GOKAPI_MAX_PARALLEL_UPLOADS: ${GOKAPI_MAX_PARALLEL_UPLOADS:-4}
-    volumes:
-      - type: bind
-        source: /var/stor/gokapi/config
-        target: /app/config
-      - type: bind
-        source: /var/stor/gokapi/data
-        target: /app/data
-    networks:
-      - internal
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.gokapi.rule=Host(`${GOKAPI_DOMAIN}`)"
-      - "traefik.http.routers.gokapi.middlewares=crowdsec@docker"
-      - "traefik.http.routers.gokapi.entrypoints=websecure"
-      - "traefik.http.routers.gokapi.tls=true"
-      - "traefik.http.routers.gokapi.tls.certresolver=letsencrypt"
-      - "traefik.http.services.gokapi.loadbalancer.server.port=53842"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
-    restart: unless-stopped
-    depends_on:
-      gokapi-valkey:
-        condition: service_healthy
-        restart: true
-      minio:
-        condition: service_healthy
-        restart: true
-
-  # Sadly didn't work out, maybe Matrix in the future?
-  # # Mattermost
-  # mattermost-postgres:
-  #   image: docker.io/library/postgres:16.9
-  #   environment:
-  #     POSTGRES_DB: ${MATTERMOST_DATABASE_DB:-mm}
-  #     POSTGRES_USER: ${MATTERMOST_DATABASE_USER:-mm}
-  #     POSTGRES_PASSWORD: ${MATTERMOST_DATABASE_PASSWORD}
-  #   volumes:
-  #     - type: volume
-  #       source: mattermost-postgres-vol
-  #       target: /var/lib/postgresql/data
-  #       volume:
-  #         nocopy: false
-  #   networks:
-  #     - internal
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test:
-  #       [
-  #         "CMD-SHELL",
-  #         "pg_isready -U ${MATTERMOST_DATABASE_USER:-mm} -d ${MATTERMOST_DATABASE_DB:-mm}",
-  #       ]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-  #     start_period: 10s
-
-  # mattermost-pgdumper:
-  #   image: docker.io/martlark/pg_dump:16.1
-  #   environment:
-  #     CRON_SCHEDULE: "1 * * * *"
-  #     RETAIN_COUNT: 1
-  #     PGHOST: "mattermost-postgres"
-  #     POSTGRES_DB: ${MATTERMOST_DATABASE_DB:-mm}
-  #     PGUSER: ${MATTERMOST_DATABASE_USER:-mm}
-  #     POSTGRES_PASSWORD: ${MATTERMOST_DATABASE_PASSWORD}
-  #   volumes:
-  #     - type: bind
-  #       source: /var/stor/mattermost/pgdump
-  #       target: /dump
-  #   networks:
-  #     - internal
-  #   restart: unless-stopped
-  #   depends_on:
-  #     mattermost-postgres:
-  #       condition: service_healthy
-  #       restart: true
-
-  # mattermost-restic:
+  # TODO
+  # nocodb-restic:
   #   image: ghcr.io/lobaro/restic-backup-docker:v1.4.2
   #   environment:
   #     BACKUP_CRON: "52 * * * *" # Every hour at 52nd minute
   #     RESTIC_FORGET_ARGS: "--prune --keep-last 3 --keep-hourly 12 --keep-daily 7 --keep-weekly 4 --keep-monthly 3"
-  #     RESTIC_PASSWORD: "${MATTERMOST_RESTIC_ENCRYPTION_KEY}"
-  #     RESTIC_REPOSITORY: "s3:https://${MATTERMOST_RESTIC_S3_ENDPOINT}/${MATTERMOST_RESTIC_S3_BUCKET}"
-  #     AWS_ACCESS_KEY_ID: "${MATTERMOST_RESTIC_S3_ACCESS_KEY_ID}"
-  #     AWS_SECRET_ACCESS_KEY: "${MATTERMOST_RESTIC_S3_SECRET_ACCESS_KEY}"
+  #     RESTIC_PASSWORD: "${NOCODB_RESTIC_ENCRYPTION_KEY}"
+  #     RESTIC_REPOSITORY: "s3:https://${NOCODB_RESTIC_S3_ENDPOINT}/${NOCODB_RESTIC_S3_BUCKET}"
+  #     AWS_ACCESS_KEY_ID: "${NOCODB_RESTIC_S3_ACCESS_KEY_ID}"
+  #     AWS_SECRET_ACCESS_KEY: "${NOCODB_RESTIC_S3_SECRET_ACCESS_KEY}"
   #   volumes:
   #     - type: bind
-  #       source: /var/stor/mattermost
+  #       source: /var/stor/nocodb
   #       target: /data/backup
   #       read_only: true
   #   networks:
   #     - internal
   #   restart: unless-stopped
 
-  # mattermost:
-  #   image: docker.io/mattermost/mattermost-team-edition:10.5.10
-  #   environment:
-  #     MM_SERVICESETTINGS_SITEURL: "https://${MATTERMOST_DOMAIN}"
-  #     MM_SQLSETTINGS_DRIVERNAME: "postgres"
-  #     MM_SQLSETTINGS_DATASOURCE: "postgres://${MATTERMOST_DATABASE_USER:-mm}:${MATTERMOST_DATABASE_PASSWORD}@mattermost-postgres:5432/${MATTERMOST_DATABASE_DB:-mm}?sslmode=disable&connect_timeout=10"
-  #     MM_BLEVESETTINGS_INDEXDIR: "/mattermost/bleve-indexes"
-  #   volumes:
-  #     - type: bind
-  #       source: /var/stor/mattermost/config
-  #       target: /mattermost/config
-  #     - type: bind
-  #       source: /var/stor/mattermost/data
-  #       target: /mattermost/data
-  #     - type: bind
-  #       source: /var/stor/mattermost/plugins
-  #       target: /mattermost/plugins
-  #     - type: bind
-  #       source: /var/stor/mattermost/client/plugins
-  #       target: /mattermost/client/plugins
-  #     - type: bind
-  #       source: /var/stor/mattermost/index
-  #       target: /mattermost/bleve-indexes
-  #   ports:
-  #     - "8443:8443/tcp"
-  #     - "8443:8443/udp"
-  #   networks:
-  #     - internal
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.mattermost.rule=Host(`${MATTERMOST_DOMAIN}`)"
-  #     - "traefik.http.routers.mattermost.middlewares=crowdsec@docker"
-  #     - "traefik.http.routers.mattermost.entrypoints=websecure"
-  #     - "traefik.http.routers.mattermost.tls=true"
-  #     - "traefik.http.routers.mattermost.tls.certresolver=letsencrypt"
-  #     - "traefik.http.services.mattermost.loadbalancer.server.port=8065"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
-  #   restart: unless-stopped
-  #   depends_on:
-  #     mattermost-postgres:
-  #       condition: service_healthy
-  #       restart: true
-  #     minio:
-  #       condition: service_healthy
-  #       restart: true
+  nocodb:
+    image: docker.io/nocodb/nocodb:0.265.1
+    environment:
+      NC_PUBLIC_URL: "https://${NOCODB_DOMAIN}"
+      NC_ADMIN_EMAIL: ${NOCODB_ADMIN_EMAIL}
+      NC_ADMIN_PASSWORD: ${NOCODB_ADMIN_PASSWORD}
+      NC_DB: "pg://nocodb-postgres:5432?u=${NOCODB_DATABASE_USER:-ndb}&p=${NOCODB_DATABASE_PASSWORD}&d=${NOCODB_DATABASE_DB:-ndb}"
+      NC_REDIS_URL: "redis://:${NOCODB_CACHE_PASSWORD}@nocodb-valkey:6379/0"
+      NC_SMTP_FROM: ${NOCODB_SMTP_FROM}
+      NC_SMTP_HOST: ${NOCODB_SMTP_HOST}
+      NC_SMTP_PORT: ${NOCODB_SMTP_PORT:-465}
+      NC_SMTP_USERNAME: ${NOCODB_SMTP_USERNAME}
+      NC_SMTP_PASSWORD: ${NOCODB_SMTP_PASSWORD}
+      NC_SMTP_SECURE: true
+      NC_SMTP_REJECT_UNAUTHORIZED: true
+      NC_DISABLE_TELE: true
+    volumes:
+      - type: bind
+        source: /var/stor/nocodb/data
+        target: /usr/app/data
+    networks:
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nocodb.rule=Host(`${NOCODB_DOMAIN}`)"
+      - "traefik.http.routers.nocodb.middlewares=crowdsec@docker"
+      - "traefik.http.routers.nocodb.entrypoints=websecure"
+      - "traefik.http.routers.nocodb.tls=true"
+      - "traefik.http.routers.nocodb.tls.certresolver=letsencrypt"
+      - "traefik.http.services.nocodb.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
+    restart: unless-stopped
+    depends_on:
+      nocodb-postgres:
+        condition: service_healthy
+        restart: true
+      nocodb-valkey:
+        condition: service_healthy
+        restart: true
 
   # Jitsi Meet
   jitsi-web:
@@ -659,47 +615,47 @@ services:
       internal:
     restart: unless-stopped
 
-  # MinIO
-  minio:
-    image: docker.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
-    command: "server /data --console-address ':9001'"
-    environment:
-      MINIO_BROWSER_REDIRECT_URL: "https://${MINIO_CONSOLE_DOMAIN}"
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    volumes:
-      - type: bind
-        source: /var/stor/minio/data
-        target: /data
-    networks:
-      - internal
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.minio.rule=Host(`${MINIO_S3_DOMAIN}`)"
-      - "traefik.http.routers.minio.middlewares=crowdsec@docker"
-      - "traefik.http.routers.minio.entrypoints=websecure"
-      - "traefik.http.routers.minio.tls=true"
-      - "traefik.http.routers.minio.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.minio.service=minio"
-      - "traefik.http.services.minio.loadbalancer.server.port=9000"
-      - "traefik.http.routers.minio-console.rule=Host(`${MINIO_CONSOLE_DOMAIN}`)"
-      - "traefik.http.routers.minio-console.middlewares=crowdsec@docker"
-      - "traefik.http.routers.minio-console.entrypoints=websecure"
-      - "traefik.http.routers.minio-console.tls=true"
-      - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.minio-console.service=minio-console"
-      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      retries: 3
-      start_period: 10s
-      timeout: 10s
+  # MinIO - currently unused
+  # minio:
+  #   image: docker.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
+  #   command: "server /data --console-address ':9001'"
+  #   environment:
+  #     MINIO_BROWSER_REDIRECT_URL: "https://${MINIO_CONSOLE_DOMAIN}"
+  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+  #   volumes:
+  #     - type: bind
+  #       source: /var/stor/minio/data
+  #       target: /data
+  #   networks:
+  #     - internal
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.minio.rule=Host(`${MINIO_S3_DOMAIN}`)"
+  #     - "traefik.http.routers.minio.middlewares=crowdsec@docker"
+  #     - "traefik.http.routers.minio.entrypoints=websecure"
+  #     - "traefik.http.routers.minio.tls=true"
+  #     - "traefik.http.routers.minio.tls.certresolver=letsencrypt"
+  #     - "traefik.http.routers.minio.service=minio"
+  #     - "traefik.http.services.minio.loadbalancer.server.port=9000"
+  #     - "traefik.http.routers.minio-console.rule=Host(`${MINIO_CONSOLE_DOMAIN}`)"
+  #     - "traefik.http.routers.minio-console.middlewares=crowdsec@docker"
+  #     - "traefik.http.routers.minio-console.entrypoints=websecure"
+  #     - "traefik.http.routers.minio-console.tls=true"
+  #     - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
+  #     - "traefik.http.routers.minio-console.service=minio-console"
+  #     - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+  #     interval: 30s
+  #     retries: 3
+  #     start_period: 10s
+  #     timeout: 10s
 
   # beszel github
 
@@ -714,7 +670,8 @@ volumes:
   wg-conf-vol:
   vaultwarden-postgres-vol:
   sftpgo-postgres-vol:
-  # mattermost-postgres-vol: # Read comment above
+  nocodb-postgres-vol:
+  nocodb-valkey-vol:
   jitsi-web-conf-vol:
   jitsi-web-crontab-vol:
   jitsi-web-transcripts-vol:
