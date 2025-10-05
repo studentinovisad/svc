@@ -475,7 +475,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.nocodb.rule=Host(`${NOCODB_DOMAIN}`)"
-      - "traefik.http.routers.nocodb.middlewares=crowdsec@docker"
+      - "traefik.http.routers.nocodb.middlewares=crowdsec@docker,authelia@docker"
       - "traefik.http.routers.nocodb.entrypoints=websecure"
       - "traefik.http.routers.nocodb.tls=true"
       - "traefik.http.routers.nocodb.tls.certresolver=letsencrypt"
@@ -484,6 +484,9 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=stream"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=${BOUNCER_KEY_TRAEFIK}"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
+      - "traefik.http.middlewares.authelia.forwardAuth.address=https://auth.blokada.info/api/authz/forward-auth"
+      - "traefik.http.middlewares.authelia.forwardAuth.trustForwardHeader=true"
+      - "traefik.http.middlewares.authelia.forwardAuth.authResponseHeaders=Remote-User,Remote-Groups,Remote-Email,Remote-Name"
     restart: unless-stopped
     depends_on:
       nocodb-postgres:
